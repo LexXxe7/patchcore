@@ -21,7 +21,32 @@ def compute_imagewise_retrieval_metrics(
     auroc = metrics.roc_auc_score(
         anomaly_ground_truth_labels, anomaly_prediction_weights
     )
-    return {"auroc": auroc, "fpr": fpr, "tpr": tpr, "threshold": thresholds}
+
+    precision, recall, thresholds = metrics.precision_recall_curve(
+        anomaly_ground_truth_labels, anomaly_prediction_weights
+    )
+    F1_scores = np.divide(
+        2 * precision * recall,
+        precision + recall,
+        out=np.zeros_like(precision),
+        where=(precision + recall) != 0,
+    )
+
+    optimal_threshold = thresholds[np.argmax(F1_scores)]
+    predictions = (anomaly_prediction_weights >= optimal_threshold).astype(int)
+
+    confusion_matrix = metrics.confusion_matrix(
+        anomaly_ground_truth_labels, predictions
+    )
+    confusion_matrix_display = metrics.ConfusionMatrixDisplay(confusion_matrix)
+
+    return {
+        "auroc": auroc,
+        "fpr": fpr,
+        "tpr": tpr,
+        "optimal_threshold": optimal_threshold,
+        "confusion_matrix_display": confusion_matrix_display,
+    }
 
 
 def compute_pixelwise_retrieval_metrics(anomaly_segmentations, ground_truth_masks):

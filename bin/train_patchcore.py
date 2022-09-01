@@ -168,9 +168,19 @@ def run(
                 )
 
             LOGGER.info("Computing evaluation metrics.")
-            auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
+            image_scores = patchcore.metrics.compute_imagewise_retrieval_metrics(
                 scores, anomaly_labels
-            ).get("auroc")
+            )
+            auroc = image_scores.get("auroc")
+
+            confusion_matrix_save_path = os.path.join(
+                run_save_path, "confusion_matrices", dataset_name
+            )
+            os.makedirs(confusion_matrix_save_path, exist_ok=True)
+            confusion_matrix_display = image_scores.get("confusion_matrix_display")
+            confusion_matrix_display.plot().figure_.savefig(
+                os.path.join(confusion_matrix_save_path, "confusion_matrix.png")
+            )
 
             # Compute PRO score and PW Auroc for all images.
             pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
@@ -192,6 +202,7 @@ def run(
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
+                    "confusion_matrix": confusion_matrix_display.confusion_matrix,
                     "instance_auroc": auroc,
                     "full_pixel_auroc": full_pixel_auroc,
                     "anomaly_pixel_auroc": anomaly_pixel_auroc,
@@ -200,7 +211,11 @@ def run(
 
             for key, value in result_collect[-1].items():
                 if key != "dataset_name":
-                    LOGGER.info(f"{key}: {value:3.3f}")
+                    if key == "confusion_matrix":
+                        tn, fp, fn, tp = value.ravel()
+                        LOGGER.info(f"{key}: {tn} {fp}\n" + " " * 33 + f"{fn} {tp}")
+                    else:
+                        LOGGER.info(f"{key}: {value:3.3f}")
 
             # (Optional) Store PatchCore model for later re-use.
             if save_patchcore_model:

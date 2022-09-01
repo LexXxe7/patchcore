@@ -133,8 +133,12 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
                 def mask_transform(mask):
                     return dataloaders["testing"].dataset.transform_mask(mask).numpy()
 
+                image_save_path = os.path.join(
+                    results_path, "segmentation_images", dataset_name
+                )
+                os.makedirs(image_save_path, exist_ok=True)
                 patchcore.utils.plot_segmentation_images(
-                    results_path,
+                    image_save_path,
                     image_paths,
                     segmentations,
                     anomaly_scores=scores,
@@ -144,9 +148,19 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
                 )
 
             LOGGER.info("Computing evaluation metrics.")
-            auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
+            image_scores = patchcore.metrics.compute_imagewise_retrieval_metrics(
                 scores, anomaly_labels
-            ).get("auroc")
+            )
+            auroc = image_scores.get("auroc")
+
+            confusion_matrix_save_path = os.path.join(
+                results_path, "confusion_matrices", dataset_name
+            )
+            os.makedirs(confusion_matrix_save_path, exist_ok=True)
+            confusion_matrix_display = image_scores.get("confusion_matrix_display")
+            confusion_matrix_display.plot().figure_.savefig(
+                os.path.join(confusion_matrix_save_path, "confusion_matrix.png")
+            )
 
             # Compute PRO score and PW Auroc for all images.
             pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
@@ -168,6 +182,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
+                    "confusion_matrix": confusion_matrix_display.confusion_matrix,
                     "instance_auroc": auroc,
                     "full_pixel_auroc": full_pixel_auroc,
                     "anomaly_pixel_auroc": anomaly_pixel_auroc,
@@ -176,7 +191,11 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
 
             for key, value in result_collect[-1].items():
                 if key != "dataset_name":
-                    LOGGER.info(f"{key}: {value:3.3f}")
+                    if key == "confusion_matrix":
+                        tn, fp, fn, tp = value.ravel()
+                        LOGGER.info(f"{key}: {tn} {fp}\n" + " " * 33 + f"{fn} {tp}")
+                    else:
+                        LOGGER.info(f"{key}: {value:3.3f}")
 
             del PatchCore_list
             gc.collect()
