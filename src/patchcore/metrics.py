@@ -1,6 +1,9 @@
 import numpy as np
 from sklearn import metrics
 
+from patchcore.metrics_generic_utils import trapezoid
+from patchcore.metrics_pro_curve_utils import compute_pro
+
 
 def compute_imagewise_retrieval_metrics(
     anomaly_prediction_weights, anomaly_ground_truth_labels
@@ -90,6 +93,16 @@ def compute_pixelwise_retrieval_metrics(anomaly_segmentations, ground_truth_mask
     fpr_optim = np.mean(predictions > flat_ground_truth_masks)
     fnr_optim = np.mean(predictions < flat_ground_truth_masks)
 
+    integration_limit = 0.3
+    num_thresholds = 1000
+
+    anomaly_segmentations = anomaly_segmentations.squeeze()
+    ground_truth_masks = ground_truth_masks.squeeze()
+
+    fprs, pros = compute_pro(anomaly_segmentations, ground_truth_masks, num_thresholds)
+    aupro = trapezoid(fprs, pros, x_max=integration_limit)
+    aupro /= integration_limit
+
     return {
         "auroc": auroc,
         "fpr": fpr,
@@ -97,4 +110,6 @@ def compute_pixelwise_retrieval_metrics(anomaly_segmentations, ground_truth_mask
         "optimal_threshold": optimal_threshold,
         "optimal_fpr": fpr_optim,
         "optimal_fnr": fnr_optim,
+        "aupro": aupro,
+        "integration_limit": integration_limit,
     }
