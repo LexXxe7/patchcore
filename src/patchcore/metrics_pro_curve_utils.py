@@ -1,5 +1,3 @@
-from tqdm import tqdm
-
 import numpy as np
 from scipy.ndimage.measurements import label
 
@@ -102,11 +100,8 @@ def collect_anomaly_scores(anomaly_maps, ground_truth_maps):
 
     # Collect the anomaly scores within each ground truth component and for all
     # potential false positive pixels.
-    print("Collect anomaly scores...")
     ok_index = 0
-    for gt_map, prediction in tqdm(
-        zip(ground_truth_maps, anomaly_maps), total=len(ground_truth_maps)
-    ):
+    for gt_map, prediction in zip(ground_truth_maps, anomaly_maps):
         # Compute the connected components in the ground truth map.
         labeled, n_components = label(gt_map, structure)
 
@@ -124,7 +119,6 @@ def collect_anomaly_scores(anomaly_maps, ground_truth_maps):
 
     # Sort all potential false positive pixels.
     anomaly_scores_ok_pixels = np.resize(anomaly_scores_ok_pixels, ok_index)
-    print(f"Sort {len(anomaly_scores_ok_pixels)} anomaly scores...")
     anomaly_scores_ok_pixels.sort()
 
     return ground_truth_components, anomaly_scores_ok_pixels
@@ -162,10 +156,9 @@ def compute_pro(anomaly_maps, ground_truth_maps, num_thresholds):
         0, len(anomaly_scores_ok_pixels) - 1, num=num_thresholds, dtype=int
     )
 
-    print("Compute PRO curve...")
     fprs = [1.0]
     pros = [1.0]
-    for pos in tqdm(threshold_positions):
+    for pos in threshold_positions:
         threshold = anomaly_scores_ok_pixels[pos]
 
         # Compute the false positive rate for this threshold.
