@@ -187,6 +187,8 @@ def run(
                 segmentations, masks_gt
             )
             full_pixel_auroc = pixel_scores.get("auroc")
+            full_aupro = pixel_scores.get("aupro")
+            integration_limit = pixel_scores.get("integration_limit")
 
             # Compute PRO score and PW Auroc only for images with anomalies.
             sel_idxs = []
@@ -198,6 +200,7 @@ def run(
                 [masks_gt[i] for i in sel_idxs],
             )
             anomaly_pixel_auroc = pixel_scores.get("auroc")
+            anomaly_aupro = pixel_scores.get("aupro")
 
             result_collect.append(
                 {
@@ -205,7 +208,9 @@ def run(
                     "confusion_matrix": confusion_matrix_display.confusion_matrix,
                     "instance_auroc": auroc,
                     "full_pixel_auroc": full_pixel_auroc,
+                    "full_aupro": full_aupro,
                     "anomaly_pixel_auroc": anomaly_pixel_auroc,
+                    "anomaly_aupro": anomaly_aupro,
                 }
             )
 
@@ -214,6 +219,10 @@ def run(
                     if key == "confusion_matrix":
                         tn, fp, fn, tp = value.ravel()
                         LOGGER.info(f"{key}: {tn} {fp}\n" + " " * 33 + f"{fn} {tp}")
+                    elif key == "full_aupro" or key == "anomaly_aupro":
+                        LOGGER.info(
+                            f"{key}: {value:3.3f} (fpr limit: {integration_limit})"
+                        )
                     else:
                         LOGGER.info(f"{key}: {value:3.3f}")
 
