@@ -243,6 +243,8 @@ def run(
         LOGGER.info("\n\n-----\n")
 
     # Store all results and mean scores to a CSV file.
+    for results in result_collect:
+        del results["confusion_matrix"]
     result_metric_names = list(result_collect[-1].keys())[1:]
     result_dataset_names = [results.get("dataset_name") for results in result_collect]
     result_scores = [list(results.values())[1:] for results in result_collect]
