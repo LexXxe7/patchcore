@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 from PIL import Image
 import torch
 
@@ -16,6 +17,7 @@ def plot_segmentation_images(
     savefolder,
     image_paths,
     segmentations,
+    optimal_threshold,
     anomaly_scores=None,
     mask_paths=None,
     image_transform=lambda x: x,
@@ -29,6 +31,7 @@ def plot_segmentation_images(
         savefolder: [str]. Path to save folder.
         image_paths: [list of str]. List of paths to images.
         segmentations: [list of np.ndarray]. Generated anomaly segmentations.
+        optimal_threshold: [float]. Pixel-wise optimal threshold.
         anomaly_scores: [list of float]. Anomaly scores for each image.
         mask_paths: [list of str]. List of paths to ground truth masks.
         image_transform: [function or lambda]. Optional transformation of images.
@@ -63,6 +66,37 @@ def plot_segmentation_images(
             else:
                 mask = np.zeros_like(image)
 
+        segmentation_mask = segmentation >= optimal_threshold
+        segmentation = cv2.applyColorMap(np.uint8(255 * segmentation), cv2.COLORMAP_HOT)
+
+        alpha = 0.5
+        image_with_segmentation = cv2.addWeighted(
+            image.transpose(1, 2, 0), alpha, segmentation, 1.0 - alpha, 0.0
+        )
+
+        contours, hierarchy = cv2.findContours(
+            segmentation_mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE
+        )
+        fat_contours_image_color = cv2.drawContours(
+            np.zeros_like(image_with_segmentation), contours, -1, (255, 255, 255), 2
+        )
+        fat_contours_image_gray = cv2.cvtColor(
+            fat_contours_image_color, cv2.COLOR_BGR2GRAY
+        )
+        fat_contours = np.argwhere(fat_contours_image_gray == 255)
+        for i, j in fat_contours:
+            image_with_segmentation[i, j] = 0
+
+        fat_contours_image = cv2.drawContours(
+            np.zeros_like(image_with_segmentation), contours, -1, (100, 100, 100), 2
+        )
+        fat_contours_segmentation = cv2.applyColorMap(
+            fat_contours_image, cv2.COLORMAP_HOT
+        )
+        image_with_segmentation = cv2.addWeighted(
+            image_with_segmentation, 1.0, fat_contours_segmentation, 1.0, 0.0
+        )
+
         savename = image_path.split("/")
         savename = "_".join(savename[-save_depth:])
         savefoldername = savename.split("\\")
@@ -73,11 +107,12 @@ def plot_segmentation_images(
             os.makedirs(savefoldername, exist_ok=True)
         savename = os.path.join(savefolder, savename)
 
-        f, axes = plt.subplots(1, 2 + int(masks_provided))
-        axes[0].imshow(image.transpose(1, 2, 0))
-        axes[1].imshow(mask.transpose(1, 2, 0))
-        axes[2].imshow(segmentation)
-        f.set_size_inches(3 * (2 + int(masks_provided)), 3)
+        f, axes = plt.subplots(2, 2)
+        axes[0, 0].imshow(image.transpose(1, 2, 0))
+        axes[0, 1].imshow(mask.transpose(1, 2, 0))
+        axes[1, 0].imshow(cv2.cvtColor(segmentation, cv2.COLOR_BGR2RGB))
+        axes[1, 1].imshow(cv2.cvtColor(image_with_segmentation, cv2.COLOR_BGR2RGB))
+        f.set_size_inches(9, 9)
         f.tight_layout()
         f.savefig(savename)
         plt.close()
